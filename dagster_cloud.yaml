@@ -1,0 +1,4 @@
+locations:
+  - location_name: hltv
+    code_source:
+      package_name: hltv
