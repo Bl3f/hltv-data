@@ -5,15 +5,20 @@ import requests
 from bs4 import BeautifulSoup
 
 from dagster import asset, WeeklyPartitionsDefinition, AssetIn, TimeWindowPartitionMapping, MetadataValue, Definitions, \
-    EnvVar
+    EnvVar, DagsterType
 from dagster_gcp import ConfigurablePickledObjectGCSIOManager
 
 from .ressources import GCSResource
 
 partitions_def = WeeklyPartitionsDefinition(start_date="2015-10-05", day_offset=1)
 
+HtmlValid = DagsterType(
+    name="HtmlValid",
+    type_check_fn=lambda _, value: "Just a moment" not in value,
+)
 
-@asset(partitions_def=partitions_def, io_manager_key="io_manager")
+
+@asset(partitions_def=partitions_def, dagster_type=HtmlValid, io_manager_key="io_manager")
 def world_ranking_html(context) -> str:
     date = datetime.strptime(context.partition_key, "%Y-%m-%d")
     url = f"https://www.hltv.org/ranking/teams/{date.year}/{date.strftime('%B').lower()}/{date.day}"
