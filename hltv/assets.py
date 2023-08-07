@@ -4,7 +4,8 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-from dagster import asset, WeeklyPartitionsDefinition, AssetIn, TimeWindowPartitionMapping, MetadataValue, Definitions
+from dagster import asset, WeeklyPartitionsDefinition, AssetIn, TimeWindowPartitionMapping, MetadataValue, Definitions, \
+    EnvVar
 from dagster_gcp import ConfigurablePickledObjectGCSIOManager
 
 from .ressources import GCSResource
@@ -69,7 +70,7 @@ defs = Definitions(
             gcs_bucket="bdp-hltv",
             gcs=GCSResource(
                 project="blef-data-platform",
-                file="/Users/blef/Downloads/blef-data-platform-91831b6b3569.json",
+                service_account_json=EnvVar("SERVICE_ACCOUNT_JSON"),
             )
         ),
     }
