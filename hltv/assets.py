@@ -92,8 +92,9 @@ def world_ranking(context, world_ranking_html) -> pd.DataFrame:
 
 @asset
 def teams(context, world_ranking):
-    df = pd.concat(world_ranking)
-    df = df[["date", "team", "team_id", "points", "change"]]
+    df = pd.concat(world_ranking).reset_index()
+    df = df[["level_0", "level_1", "team", "team_id", "points", "change"]]
+    df.rename(columns={"level_0": "date", "level_1": "rank"}, inplace=True)
 
     df["points"] = df["points"].str.extract(r"(\d+)")
 
