@@ -50,11 +50,31 @@ def world_ranking(context, world_ranking_html) -> pd.DataFrame:
         team_change = team.select_one('.change').text
         team_name = team.select_one('.teamLine .name').text
         team_points = team.select_one('.teamLine .points').text
+        team_id = team.select_one('a.moreLink:first-child', href=True)['href']
+
+        players = []
+
+        for player in team.select('td.player-holder'):
+            player_id = player.select_one('.pointer', href=True)['href']
+            player_name = player.select_one('img.playerPicture')['title']
+            player_nick = player.select_one('.nick').text
+            country = player.select_one('.nick img')['title']
+            country_isocode = player.select_one('.nick img')['src']
+
+            players.append({
+                "id": player_id,
+                "name": player_name,
+                "nick": player_nick,
+                "country": country,
+                "country_isocode": country_isocode,
+            })
 
         output.append({
             "team": team_name,
+            "team_id": team_id,
             "points": team_points,
             "change": team_change,
+            "players": players,
         })
 
     df = pd.DataFrame(output)
