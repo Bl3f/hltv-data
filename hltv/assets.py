@@ -70,6 +70,7 @@ def world_ranking(context, world_ranking_html) -> pd.DataFrame:
             })
 
         output.append({
+            "date": context.asset_partition_key_for_output(),
             "team": team_name,
             "team_id": team_id,
             "points": team_points,
@@ -78,6 +79,7 @@ def world_ranking(context, world_ranking_html) -> pd.DataFrame:
         })
 
     df = pd.DataFrame(output)
+    df.index += 1
 
     context.add_output_metadata(
         metadata={
@@ -88,8 +90,40 @@ def world_ranking(context, world_ranking_html) -> pd.DataFrame:
     return df
 
 
+@asset
+def teams(context, world_ranking):
+    df = pd.concat(world_ranking)
+    df = df[["date", "team", "team_id", "points", "change"]]
+
+    df["points"] = df["points"].str.extract(r"(\d+)")
+
+    context.add_output_metadata(
+        metadata={
+            "nb_rows": len(df),
+            "preview": MetadataValue.md(df.head().to_markdown()),
+        }
+    )
+
+    return df
+
+
+@asset
+def players(context, world_ranking):
+    df = pd.concat(world_ranking)
+    out = pd.json_normalize(df["players"])
+
+    context.add_output_metadata(
+        metadata={
+            "nb_rows": len(out),
+            "preview": MetadataValue.md(out.head().to_markdown()),
+        }
+    )
+
+    return out
+
+
 defs = Definitions(
-    assets=[world_ranking_html, world_ranking],
+    assets=[world_ranking_html, world_ranking, players, teams],
     resources={
         "io_manager": ConfigurablePickledObjectGCSIOManager(
             gcs_bucket="bdp-hltv",
