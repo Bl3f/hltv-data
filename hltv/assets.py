@@ -1,16 +1,17 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import List
 
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
 from dagster import asset, WeeklyPartitionsDefinition, AssetIn, TimeWindowPartitionMapping, MetadataValue, Definitions, \
-    EnvVar, DagsterType
+    EnvVar, DagsterType, TimeWindowPartitionsDefinition
 from dagster_gcp import ConfigurablePickledObjectGCSIOManager
 
 from .ressources import GCSResource
 
-partitions_def = WeeklyPartitionsDefinition(start_date="2015-10-05", day_offset=1)
+partitions_def = WeeklyPartitionsDefinition(start_date="2015-10-05", day_offset=1, end_offset=1)
 
 HtmlValid = DagsterType(
     name="HtmlValid",
@@ -123,8 +124,92 @@ def players(context, world_ranking):
     return out
 
 
+events_partitions_def = TimeWindowPartitionsDefinition(
+    cron_schedule="0 0 1 1 *",
+    start=datetime(2012, 1, 1),
+    end_offset=1,
+    fmt="%Y-%m-%d",
+)
+
+
+@asset(
+    partitions_def=events_partitions_def,
+)
+def events_html(context) -> List[str]:
+    window = context.partition_time_window
+    url = f"https://www.hltv.org/events/archive?startDate={window.start.strftime('%Y-%m-%d')}&endDate={(window.end - timedelta(days=1)).strftime('%Y-%m-%d')}&eventType=MAJOR&eventType=INTLLAN&eventType=ONLINE&prizeMin=50000&prizeMax=3000000"
+    headers = {
+        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36",
+    }
+
+    responses = []
+
+    while True:
+        context.log.info(url)
+        response = requests.get(url, headers=headers)
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+        next_page = soup.select_one(".pagination-next:not(.inactive)")
+
+        responses.append(response.text)
+
+        if next_page:
+            url = f"https://www.hltv.org/{next_page['href']}"
+        else:
+            break
+
+    return responses
+
+
+@asset(
+    partitions_def=events_partitions_def,
+    ins={
+        "events_html": AssetIn(
+            partition_mapping=TimeWindowPartitionMapping(),
+        )
+    },
+)
+def events(context, events_html) -> pd.DataFrame:
+    output = []
+    for page in events_html:
+        context.log.info(page)
+
+        soup = BeautifulSoup(page, 'html.parser')
+
+        for event in soup.select(".small-event"):
+            context.log.info(event)
+            href = event["href"]
+            event_name = event.select_one("td.event-col").text
+            nb_teams = event.select_one("tr > td:nth-child(2)").text
+            prize_pool = event.select_one("td.prizePoolEllipsis").text
+            event_type = event.select_one("td.gtSmartphone-only").text
+            country = event.select_one("td .smallCountry").text
+            dates = [date.text for date in event.select("span[data-unix]")]
+
+            output.append({
+                "event_name": event_name,
+                "country": country,
+                "nb_teams": nb_teams,
+                "prize_pool": prize_pool,
+                "event_type": event_type,
+                "href": href,
+                "dates": dates,
+            })
+
+    df = pd.DataFrame(output)
+
+    context.add_output_metadata(
+        metadata={
+            "preview": MetadataValue.md(df.head().to_markdown()),
+            "nb_rows": MetadataValue.int(len(df)),
+        }
+    )
+
+    return df
+
+
 defs = Definitions(
-    assets=[world_ranking_html, world_ranking, players, teams],
+    assets=[world_ranking_html, world_ranking, players, teams, events_html, events],
     resources={
         "io_manager": ConfigurablePickledObjectGCSIOManager(
             gcs_bucket="bdp-hltv",
