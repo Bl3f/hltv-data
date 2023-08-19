@@ -136,6 +136,7 @@ events_partitions_def = TimeWindowPartitionsDefinition(
 
 @asset(
     partitions_def=events_partitions_def,
+    dagster_type=HtmlValid,
 )
 def events_html(context) -> List[str]:
     window = context.partition_time_window
@@ -227,28 +228,41 @@ def events_details(context, events) -> pd.DataFrame:
 
     for event_href in events["href"]:
         url = f"https://www.hltv.org{event_href}"
-        context.log.info(url)
-        response = requests.get(url, headers=headers)
-        soup = BeautifulSoup(response.text, "html.parser")
 
-        try:
-            for placement in soup.select(".placement"):
-                team = placement.select_one(".team a").text
-                team_href = placement.select_one(".team a")["href"]
-                rank = placement.select_one("div:nth-child(2)").text
-                prize = placement.select_one("div:nth-child(3)").text
+        retry = 0
+        RETRY_MAX = 5
+        while retry < RETRY_MAX:
+            context.log.info(url)
+            response = requests.get(url, headers=headers)
 
-                placements.append({
-                    "team": team,
-                    "team_href": team_href,
-                    "rank": rank,
-                    "prize": prize,
-                })
+            if "Just a moment" in response.text:
+                retry += 1
+                context.log.info(f"Retrying... (n°{retry})")
+                time.sleep(retry * 20)
+                continue
 
-                time.sleep(random.randint(1, 20))
-        except Exception as er:
-            print(response.text)
-            raise
+            soup = BeautifulSoup(response.text, "html.parser")
+
+            try:
+                for placement in soup.select(".placement"):
+                    team = placement.select_one(".team a").text
+                    team_href = placement.select_one(".team a")["href"]
+                    rank = placement.select_one("div:nth-child(2)").text
+                    prize = placement.select_one("div:nth-child(3)").text
+
+                    placements.append({
+                        "team": team,
+                        "team_href": team_href,
+                        "rank": rank,
+                        "prize": prize,
+                    })
+
+                    time.sleep(random.randint(1, 20))
+
+                retry = RETRY_MAX * 2
+            except Exception as er:
+                print(response.text)
+                raise
 
     df = pd.DataFrame(placements)
 
