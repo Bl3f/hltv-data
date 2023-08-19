@@ -251,6 +251,7 @@ def events_details(context, events) -> pd.DataFrame:
                     prize = placement.select_one("div:nth-child(3)").text
 
                     placements.append({
+                        "event": event_href,
                         "team": team,
                         "team_href": team_href,
                         "rank": rank,
