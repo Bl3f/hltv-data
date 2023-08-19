@@ -243,8 +243,8 @@ def events_details(context, events) -> pd.DataFrame:
 
             soup = BeautifulSoup(response.text, "html.parser")
 
-            try:
-                for placement in soup.select(".placement"):
+            for placement in soup.select(".placement"):
+                try:
                     team = placement.select_one(".team a").text
                     team_href = placement.select_one(".team a")["href"]
                     rank = placement.select_one("div:nth-child(2)").text
@@ -257,13 +257,13 @@ def events_details(context, events) -> pd.DataFrame:
                         "rank": rank,
                         "prize": prize,
                     })
+                except Exception as er:
+                    context.log.info(placement)
+                    raise
 
-                    time.sleep(random.randint(1, 20))
+                time.sleep(random.randint(1, 20))
 
-                retry = RETRY_MAX * 2
-            except Exception as er:
-                print(response.text)
-                raise
+            retry = RETRY_MAX * 2
 
     df = pd.DataFrame(placements)
 
