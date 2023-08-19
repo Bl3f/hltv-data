@@ -243,7 +243,7 @@ def events_details(context, events) -> pd.DataFrame:
 
             soup = BeautifulSoup(response.text, "html.parser")
 
-            for placement in soup.select(".placement"):
+            for placement in soup.select(".placements .placement"):
                 try:
                     team = placement.select_one(".team a").text
                     team_href = placement.select_one(".team a")["href"]
