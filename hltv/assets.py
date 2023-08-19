@@ -1,3 +1,5 @@
+import random
+import time
 from datetime import datetime, timedelta
 from typing import List
 
@@ -208,8 +210,60 @@ def events(context, events_html) -> pd.DataFrame:
     return df
 
 
+@asset(
+    partitions_def=events_partitions_def,
+    ins={
+        "events": AssetIn(
+            partition_mapping=TimeWindowPartitionMapping(),
+        )
+    },
+)
+def events_details(context, events) -> pd.DataFrame:
+    headers = {
+        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36",
+    }
+
+    placements = []
+
+    for event_href in events["href"]:
+        url = f"https://www.hltv.org{event_href}"
+        context.log.info(url)
+        response = requests.get(url, headers=headers)
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        try:
+            for placement in soup.select(".placement"):
+                team = placement.select_one(".team a").text
+                team_href = placement.select_one(".team a")["href"]
+                rank = placement.select_one("div:nth-child(2)").text
+                prize = placement.select_one("div:nth-child(3)").text
+
+                placements.append({
+                    "team": team,
+                    "team_href": team_href,
+                    "rank": rank,
+                    "prize": prize,
+                })
+
+                time.sleep(random.randint(1, 20))
+        except Exception as er:
+            print(response.text)
+            raise
+
+    df = pd.DataFrame(placements)
+
+    context.add_output_metadata(
+        metadata={
+            "preview": MetadataValue.md(df.head().to_markdown()),
+            "nb_rows": MetadataValue.int(len(df)),
+        }
+    )
+
+    return df
+
+
 defs = Definitions(
-    assets=[world_ranking_html, world_ranking, players, teams, events_html, events],
+    assets=[world_ranking_html, world_ranking, players, teams, events_html, events, events_details],
     resources={
         "io_manager": ConfigurablePickledObjectGCSIOManager(
             gcs_bucket="bdp-hltv",
