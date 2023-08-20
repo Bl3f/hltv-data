@@ -140,7 +140,7 @@ events_partitions_def = TimeWindowPartitionsDefinition(
 )
 def events_html(context) -> List[str]:
     window = context.partition_time_window
-    url = f"https://www.hltv.org/events/archive?startDate={window.start.strftime('%Y-%m-%d')}&endDate={(window.end - timedelta(days=1)).strftime('%Y-%m-%d')}&eventType=MAJOR&eventType=INTLLAN&eventType=ONLINE&prizeMin=50000&prizeMax=3000000"
+    url = f"https://www.hltv.org/events/archive?startDate={window.start.strftime('%Y-%m-%d')}&endDate={(window.end - timedelta(days=1)).strftime('%Y-%m-%d')}&eventType=MAJOR&eventType=INTLLAN&eventType=ONLINE"
     headers = {
         'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36",
     }
