@@ -285,6 +285,60 @@ def events_details(context, events) -> pd.DataFrame:
     return df
 
 
+@asset(
+    partitions_def=events_partitions_def,
+    ins={
+        "events": AssetIn(
+            partition_mapping=TimeWindowPartitionMapping(),
+        )
+    },
+)
+def events_matches(context, events) -> pd.DataFrame:
+    headers = {
+        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36",
+    }
+
+    matches = []
+
+    for event_href in events["href"]:
+        _, event_id, event_name = event_href.split("/")
+
+        response = requests.get(f"https://www.hltv.org/results?event={event_id}", headers=headers)
+
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        for day in soup.select(".results-sublist"):
+            for match in day.select(".result-con"):
+                timestamp = match["data-zonedgrouping-entry-unix"]
+                match_href = match.select_one(".a-reset")["href"]
+                team1 = match.select_one(".team1").text
+                team2 = match.select_one(".team2").text
+                team_won = match.select_one(".team-won").text
+                score_won = match.select_one(".score-won")
+                score_lost = match.select_one(".score-lost")
+
+                matches.append({
+                    "timestamp": timestamp,
+                    "match_href": match_href,
+                    "team1": team1,
+                    "team2": team2,
+                    "team_won": team_won,
+                    "score_won": score_won,
+                    "score_lost": score_lost,
+                })
+
+    df = pd.DataFrame(matches)
+
+    context.add_output_metadata(
+        metadata={
+            "preview": MetadataValue.md(df.head().to_markdown()),
+            "nb_rows": MetadataValue.int(len(df)),
+        }
+    )
+
+    return df
+
+
 defs = Definitions(
     assets=[world_ranking_html, world_ranking, players, teams, events_html, events, events_details],
     resources={
