@@ -262,14 +262,14 @@ def events_details(context, events) -> pd.DataFrame:
                     context.log.info(placement)
                     placements.append({
                         "event": event_href,
-                        "team": team,
-                        "team_href": team_href,
-                        "rank": rank,
-                        "prize": prize,
+                        "team": None,
+                        "team_href": None,
+                        "rank": None,
+                        "prize": None,
                         "status": "error",
                     })
 
-                time.sleep(random.randint(1, 20))
+                # time.sleep(random.randint(1, 20))
 
             retry = RETRY_MAX * 2
 
