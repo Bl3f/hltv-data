@@ -256,10 +256,18 @@ def events_details(context, events) -> pd.DataFrame:
                         "team_href": team_href,
                         "rank": rank,
                         "prize": prize,
+                        "status": None
                     })
                 except Exception as er:
                     context.log.info(placement)
-                    raise
+                    placements.append({
+                        "event": event_href,
+                        "team": team,
+                        "team_href": team_href,
+                        "rank": rank,
+                        "prize": prize,
+                        "status": "error",
+                    })
 
                 time.sleep(random.randint(1, 20))
 
