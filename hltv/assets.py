@@ -301,7 +301,8 @@ def events_matches(context, events) -> pd.DataFrame:
     matches = []
 
     for event_href in events["href"]:
-        _, event_id, event_name = event_href.split("/")
+        context.log.info(event_href)
+        _, _, event_id, event_name = event_href.split("/")
 
         response = requests.get(f"https://www.hltv.org/results?event={event_id}", headers=headers)
 
@@ -313,18 +314,27 @@ def events_matches(context, events) -> pd.DataFrame:
                 match_href = match.select_one(".a-reset")["href"]
                 team1 = match.select_one(".team1").text
                 team2 = match.select_one(".team2").text
-                team_won = match.select_one(".team-won").text
-                score_won = match.select_one(".score-won")
-                score_lost = match.select_one(".score-lost")
+                try:
+                    team_won = match.select_one(".team-won").text
+                    score_won = match.select_one(".score-won").text
+                    score_lost = match.select_one(".score-lost").text
+                    score = match.select_one(".result-score").text
+                except AttributeError as er:
+                    team_won = None
+                    score_won = match.select(".score-tie")[0].text
+                    score_lost = score_won
+                    score = match.select_one(".result-score").text
 
                 matches.append({
-                    "timestamp": timestamp,
                     "match_href": match_href,
+                    "timestamp": timestamp,
+                    "event_href": event_href,
                     "team1": team1,
                     "team2": team2,
                     "team_won": team_won,
                     "score_won": score_won,
                     "score_lost": score_lost,
+                    "score": score,
                 })
 
     df = pd.DataFrame(matches)
@@ -340,7 +350,7 @@ def events_matches(context, events) -> pd.DataFrame:
 
 
 defs = Definitions(
-    assets=[world_ranking_html, world_ranking, players, teams, events_html, events, events_details],
+    assets=[world_ranking_html, world_ranking, players, teams, events_html, events, events_details, events_matches],
     resources={
         "io_manager": ConfigurablePickledObjectGCSIOManager(
             gcs_bucket="bdp-hltv",
